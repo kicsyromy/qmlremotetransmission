@@ -1,0 +1,3 @@
+[submodule "3rdparty/libremotetransmission"]
+	path = 3rdparty/libremotetransmission
+	url = https://github.com/kicsyromy/libremotetransmission.git

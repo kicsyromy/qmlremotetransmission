@@ -1,0 +1,3 @@
+module @TARGET@
+plugin @TARGET@
+typeinfo @QMLTYPES_FILE@

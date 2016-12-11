@@ -1,0 +1,8 @@
+if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+    set (QMLPLUGINDUMP_EXECUTABLE "qmlplugindump.exe")
+else ()
+    set (QMLPLUGINDUMP_EXECUTABLE "qmlplugindump")
+endif ()
+get_target_property (QMAKE_CMD Qt5::qmake IMPORTED_LOCATION)
+string (REGEX REPLACE "/qmake" "" QT_BIN_DIR "${QMAKE_CMD}")
+file (TO_NATIVE_PATH "${QT_BIN_DIR}/${QMLPLUGINDUMP_EXECUTABLE}" QMLPLUGINDUMP_COMMAND)
