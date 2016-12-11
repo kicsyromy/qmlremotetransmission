@@ -2,9 +2,15 @@
 #define SESSION_H
 
 #include <QObject>
+#include <QTimer>
 #include <QString>
+#include <QPointer>
 
 #include <librt_session.h>
+
+#include "statistics.h"
+
+class TorrentList;
 
 class Session: public QObject
 {
@@ -18,9 +24,13 @@ class Session: public QObject
     Q_PROPERTY(QString password                READ password                WRITE setPassword                NOTIFY passwordChanged)
     Q_PROPERTY(int     timeout                 READ timeout                 WRITE setTimeout                 NOTIFY timeoutChanged)
     Q_PROPERTY(bool    sslErrorHandlingEnabled READ sslErrorHandlingEnabled WRITE setSslErrorHandlingEnabled NOTIFY sslErrorHandlingEnabledChanged)
+    Q_PROPERTY(int     refreshInterval         READ refreshInterval         WRITE setRefreshInterval         NOTIFY refreshIntervalChanged)
+    Q_PROPERTY(bool    active                  READ active                  WRITE setActive                  NOTIFY activeChanged)
+
+    Q_PROPERTY(Statistics* stats READ stats NOTIFY statsChanged)
 
 public:
-    Session();
+    explicit Session(QObject *parent = Q_NULLPTR);
 
 public:
     QString host() const;
@@ -47,6 +57,19 @@ public:
     bool sslErrorHandlingEnabled() const;
     void setSslErrorHandlingEnabled(bool value);
 
+    int refreshInterval() const;
+    void setRefreshInterval(int msecs);
+
+    bool active() const;
+    void setActive(bool value);
+
+public:
+    Statistics *stats();
+
+public:
+    void addTorrentList(TorrentList *torrentList);
+    void removeTorrentList(TorrentList *torrentList);
+
 signals:
     void hostChanged();
     void pathChanged();
@@ -56,6 +79,14 @@ signals:
     void passwordChanged();
     void timeoutChanged();
     void sslErrorHandlingEnabledChanged();
+    void refreshIntervalChanged();
+    void activeChanged();
+
+signals:
+    void statsChanged();
+
+private slots:
+    void update();
 
 private:
     DISABLE_COPY(Session)
@@ -63,8 +94,11 @@ private:
 
 private:
     bool sslErrorHandlingEnabled_;
+    QTimer timer_;
+    bool active_;
     librt::Session session_;
-
+    Statistics stats_;
+    std::vector<QPointer<TorrentList>> torrentLists_;
 };
 
 #endif // SESSION_H

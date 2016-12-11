@@ -1,9 +1,20 @@
 #include "session.h"
 
-Session::Session() :
+#include <QtConcurrent/QtConcurrent>
+
+#include "torrentlist.h"
+
+Session::Session(QObject *parent) :
+    QObject(parent),
     sslErrorHandlingEnabled_(true),
-    session_()
+    timer_(),
+    active_(false),
+    session_(),
+    stats_(),
+    torrentLists_()
 {
+    timer_.setInterval(5000);
+    QObject::connect(&timer_, &QTimer::timeout, this, &Session::update);
 }
 
 QString Session::host() const
@@ -135,4 +146,71 @@ void Session::setSslErrorHandlingEnabled(bool value)
         );
         emit sslErrorHandlingEnabledChanged();
     }
+}
+
+int Session::refreshInterval() const
+{
+    timer_.interval();
+}
+
+void Session::setRefreshInterval(int msecs)
+{
+    timer_.setInterval(msecs);
+}
+
+bool Session::active() const
+{
+    return active_;
+}
+
+void Session::setActive(bool value)
+{
+    if (value != active_)
+    {
+        if (value)
+        {
+            timer_.start();
+        }
+        else
+        {
+            timer_.stop();
+        }
+
+        active_ = value;
+        emit activeChanged();
+    }
+}
+
+Statistics *Session::stats()
+{
+    return &stats_;
+}
+
+void Session::addTorrentList(TorrentList *torrentList)
+{
+    torrentLists_.emplace_back(torrentList);
+}
+
+void Session::removeTorrentList(TorrentList *torrentList)
+{
+    auto it = std::find(torrentLists_.begin(), torrentLists_.end(), torrentList);
+    if (it != torrentLists_.end())
+    {
+        torrentLists_.erase(it);
+    }
+}
+
+void Session::update()
+{
+    QtConcurrent::run(QThreadPool::globalInstance(), [this]() {
+        auto r = session_.statistics();
+        if (!r.error)
+        {
+            stats_.setTotalTorrentCount(r.value.totalTorrentCount);
+            stats_.setActiveTorrentCount(r.value.activeTorrentCount);
+            stats_.setPausedTorrentCount(r.value.pausedTorrentCount);
+            stats_.setDownloadSpeed(r.value.downloadSpeed);
+            stats_.setUploadSpeed(r.value.uploadSpeed);
+        }
+    });
 }
