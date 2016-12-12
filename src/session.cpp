@@ -14,6 +14,7 @@ Session::Session(QObject *parent) :
     torrentLists_()
 {
     timer_.setInterval(5000);
+    timer_.setSingleShot(false);
     QObject::connect(&timer_, &QTimer::timeout, this, &Session::update);
 }
 
@@ -150,7 +151,7 @@ void Session::setSslErrorHandlingEnabled(bool value)
 
 int Session::refreshInterval() const
 {
-    timer_.interval();
+    return timer_.interval();
 }
 
 void Session::setRefreshInterval(int msecs)
@@ -211,6 +212,19 @@ void Session::update()
             stats_.setPausedTorrentCount(r.value.pausedTorrentCount);
             stats_.setDownloadSpeed(r.value.downloadSpeed);
             stats_.setUploadSpeed(r.value.uploadSpeed);
+        }
+    });
+    QtConcurrent::run(QThreadPool::globalInstance(), [this]() {
+        auto r = session_.torrents();
+        if (!r.error)
+        {
+            for (const auto &torrentList: torrentLists_)
+            {
+                if (!torrentList.isNull())
+                {
+                    torrentList->update(std::move(r.value));
+                }
+            }
         }
     });
 }
