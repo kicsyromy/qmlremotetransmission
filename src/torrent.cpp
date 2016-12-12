@@ -16,11 +16,15 @@ Torrent &Torrent::operator =(Torrent &&other)
 {
     setParent(other.parent());
     torrent_ = std::move(other.torrent_);
+
+    return *this;
 }
 
 Torrent &Torrent::operator =(librt::Torrent &&torrent)
 {
     torrent_ = std::move(torrent);
+
+    return *this;
 }
 
 int Torrent::id() const

@@ -11,7 +11,7 @@ Session::Session(QObject *parent) :
     active_(false),
     session_(),
     stats_(),
-    torrentLists_()
+    torrentList_(*this)
 {
     timer_.setInterval(5000);
     timer_.setSingleShot(false);
@@ -187,18 +187,9 @@ Statistics *Session::stats()
     return &stats_;
 }
 
-void Session::addTorrentList(TorrentList *torrentList)
+TorrentList *Session::torrents()
 {
-    torrentLists_.emplace_back(torrentList);
-}
-
-void Session::removeTorrentList(TorrentList *torrentList)
-{
-    auto it = std::find(torrentLists_.begin(), torrentLists_.end(), torrentList);
-    if (it != torrentLists_.end())
-    {
-        torrentLists_.erase(it);
-    }
+    return &torrentList_;
 }
 
 void Session::update()
@@ -218,13 +209,7 @@ void Session::update()
         auto r = session_.torrents();
         if (!r.error)
         {
-            for (const auto &torrentList: torrentLists_)
-            {
-                if (!torrentList.isNull())
-                {
-                    torrentList->update(std::move(r.value));
-                }
-            }
+            torrentList_.update(std::move(r.value));
         }
     });
 }

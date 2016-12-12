@@ -9,8 +9,7 @@
 #include <librt_session.h>
 
 #include "statistics.h"
-
-class TorrentList;
+#include "torrentlist.h"
 
 class Session: public QObject
 {
@@ -27,7 +26,8 @@ class Session: public QObject
     Q_PROPERTY(int     refreshInterval         READ refreshInterval         WRITE setRefreshInterval         NOTIFY refreshIntervalChanged)
     Q_PROPERTY(bool    active                  READ active                  WRITE setActive                  NOTIFY activeChanged)
 
-    Q_PROPERTY(Statistics* stats READ stats NOTIFY statsChanged)
+    Q_PROPERTY(Statistics*  stats    READ stats    NOTIFY statsChanged)
+    Q_PROPERTY(TorrentList* torrents READ torrents NOTIFY torrentsChanged)
 
 public:
     explicit Session(QObject *parent = Q_NULLPTR);
@@ -65,10 +65,7 @@ public:
 
 public:
     Statistics *stats();
-
-public:
-    void addTorrentList(TorrentList *torrentList);
-    void removeTorrentList(TorrentList *torrentList);
+    TorrentList *torrents();
 
 signals:
     void hostChanged();
@@ -84,6 +81,7 @@ signals:
 
 signals:
     void statsChanged();
+    void torrentsChanged();
 
 private slots:
     void update();
@@ -98,7 +96,7 @@ private:
     bool active_;
     librt::Session session_;
     Statistics stats_;
-    std::vector<QPointer<TorrentList>> torrentLists_;
+    TorrentList torrentList_;
 };
 
 #endif // SESSION_H

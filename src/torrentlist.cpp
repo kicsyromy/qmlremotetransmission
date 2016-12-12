@@ -7,8 +7,9 @@ namespace
     constexpr const auto TORRENT_ROLE { Qt::DisplayRole + 1 };
 }
 
-TorrentList::TorrentList(QObject *parent) :
+TorrentList::TorrentList(Session &session, QObject *parent) :
     QAbstractListModel(parent),
+    session_(&session),
     cached_(),
     torrents_(),
     mutex_(),
@@ -16,34 +17,18 @@ TorrentList::TorrentList(QObject *parent) :
 {
 }
 
-Session *TorrentList::session()
+int TorrentList::sorting()
 {
-    return session_;
+    return sorting_;
 }
 
-void TorrentList::setSession(Session *session)
+void TorrentList::setSorting(int value)
 {
-    if (session_ != session)
+    if (sorting_ != value)
     {
-        if (!session_.isNull())
-        {
-            session_->removeTorrentList(this);
-        }
-
-        session_ = session;
-
-        if (!session_.isNull())
-        {
-            session_->addTorrentList(this);
-        }
-
-        emit sessionChanged();
+        sorting_ = static_cast<Sorting>(value);
+        emit sortingChanged();
     }
-}
-
-int TorrentList::count() const
-{
-    return static_cast<int>(torrents_.size());
 }
 
 int TorrentList::rowCount(const QModelIndex &) const
@@ -62,6 +47,11 @@ QVariant TorrentList::data(const QModelIndex &index, int role) const
     }
 
     return data;
+}
+
+QHash<int, QByteArray> TorrentList::roleNames() const
+{
+    return {{ TORRENT_ROLE, "torrent" }};
 }
 
 void TorrentList::update(std::vector<librt::Torrent> &&torrents)
@@ -103,9 +93,9 @@ void TorrentList::onCachedTorrentsUpdated()
     }
 
     int currentTorrentCount = static_cast<int>(torrents_.size());
-    int newTorrentCount = static_cast<int>(tl.size());
     for (int cit = 0; cit < currentTorrentCount; ++cit)
     {
+        int newTorrentCount = static_cast<int>(tl.size());
         auto &currentTorrent = torrents_[cit];
         bool found = false;
         for (int nit = 0; nit < newTorrentCount; ++nit)
@@ -116,7 +106,6 @@ void TorrentList::onCachedTorrentsUpdated()
             {
                 currentTorrent = std::move(newTorrent);
                 tl.erase(tl.begin() + nit);
-                --newTorrentCount;
                 found = true;
                 break;
             }
@@ -157,17 +146,26 @@ void TorrentList::onCachedTorrentsUpdated()
         });
     }
 
-    for (auto &t: tl)
+    if (torrents_.empty())
+    {
+        beginResetModel();
+        for (auto &&t: newTorrents)
+        {
+            torrents_.emplace_back(std::move(*t));
+        }
+        endResetModel();
+        return;
+    }
+
+    for (auto &&t: tl)
     {
         auto it = std::find(newTorrents.begin(), newTorrents.end(), &t);
         if (it != newTorrents.end())
         {
             int row = static_cast<int>(it - newTorrents.begin());
             beginInsertRows(QModelIndex(), row, row);
-            torrents_.emplace(torrents_.begin() + row, std::move(t));
+            torrents_.insert(torrents_.begin() + row, std::move(t));
             endInsertRows();
         }
     }
-
-    emit countChanged();
 }

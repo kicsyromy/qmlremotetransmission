@@ -16,8 +16,7 @@ class TorrentList: public QAbstractListModel
 {
     Q_OBJECT
     Q_ENUMS(Sorting)
-    Q_PROPERTY(Session* session READ session WRITE setSession NOTIFY sessionChanged)
-    Q_PROPERTY(int count        READ count                    NOTIFY countChanged)
+    Q_PROPERTY(int sorting READ sorting WRITE setSorting NOTIFY sortingChanged)
 
 public:
     enum Sorting
@@ -27,21 +26,19 @@ public:
     };
 
 public:
-    TorrentList(QObject *parent = Q_NULLPTR);
+    TorrentList(Session &session, QObject *parent = Q_NULLPTR);
 
 public:
-    Session *session();
-    void setSession(Session *session);
-
-    int count() const;
+    int sorting();
+    void setSorting(int value);
 
 signals:
-    void sessionChanged();
-    void countChanged();
+    void sortingChanged();
 
 public:
     int rowCount(const QModelIndex &parent) const Q_DECL_OVERRIDE;
     QVariant data(const QModelIndex &index, int role) const Q_DECL_OVERRIDE;
+    QHash<int, QByteArray> roleNames() const Q_DECL_OVERRIDE;
 
 public:
     void update(std::vector<librt::Torrent> &&torrents);
