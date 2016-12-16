@@ -1,15 +1,68 @@
 #ifndef SESSION_H
 #define SESSION_H
 
+
 #include <QObject>
 #include <QTimer>
 #include <QString>
 #include <QPointer>
+#include <QMutex>
+#include <QThreadPool>
 
 #include <librt_session.h>
 
 #include "statistics.h"
 #include "torrentlist.h"
+
+struct StatisticsUpdate: QRunnable
+{
+    StatisticsUpdate(librt::Session &session, Statistics &stats) :
+        session_(session), stats_(stats)
+    {setAutoDelete(false);}
+    void run() Q_DECL_OVERRIDE
+    {
+        auto r = session_.statistics();
+        if (!r.error)
+        {
+            stats_.setTotalTorrentCount(r.value.totalTorrentCount);
+            stats_.setActiveTorrentCount(r.value.activeTorrentCount);
+            stats_.setPausedTorrentCount(r.value.pausedTorrentCount);
+            stats_.setDownloadSpeed(r.value.downloadSpeed);
+            stats_.setUploadSpeed(r.value.uploadSpeed);
+        }
+    }
+
+private:
+    librt::Session &session_;
+    Statistics &stats_;
+};
+
+struct TorrentListUpdate: QRunnable
+{
+    TorrentListUpdate(librt::Session &session, TorrentList &torrentList, QMutex &lock) :
+        session_(session), torrentList_(torrentList), lock_(lock)
+    {setAutoDelete(false);}
+    void run() Q_DECL_OVERRIDE
+    {
+        auto r = session_.torrents();
+        if (!r.error)
+        {
+            if (lock_.tryLock())
+            {
+                torrentList_.update(std::move(r.value));
+            }
+            else
+            {
+                return;
+            }
+        }
+    }
+
+private:
+    librt::Session &session_;
+    TorrentList &torrentList_;
+    QMutex &lock_;
+};
 
 class Session: public QObject
 {
@@ -31,6 +84,7 @@ class Session: public QObject
 
 public:
     explicit Session(QObject *parent = Q_NULLPTR);
+    ~Session();
 
 public:
     QString host() const;
@@ -91,12 +145,19 @@ private:
     DISABLE_MOVE(Session)
 
 private:
+    friend class TorrentList;
+
+private:
     bool sslErrorHandlingEnabled_;
     QTimer timer_;
     bool active_;
     librt::Session session_;
     Statistics stats_;
+    StatisticsUpdate statsUpdate_;
     TorrentList torrentList_;
+    QMutex torrentUpdateLock_;
+    TorrentListUpdate torrentListUpdate_;
+    QThreadPool workers_;
 };
 
 #endif // SESSION_H

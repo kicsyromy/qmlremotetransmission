@@ -2,6 +2,8 @@
 
 #include "session.h"
 
+#include <QDebug>
+
 namespace
 {
     constexpr const auto TORRENT_ROLE { Qt::DisplayRole + 1 };
@@ -12,7 +14,6 @@ TorrentList::TorrentList(Session &session, QObject *parent) :
     session_(&session),
     cached_(),
     torrents_(),
-    mutex_(),
     sorting_(SortByName)
 {
 }
@@ -56,32 +57,22 @@ QHash<int, QByteArray> TorrentList::roleNames() const
 
 void TorrentList::update(std::vector<librt::Torrent> &&torrents)
 {
-    std::lock_guard<std::mutex> lock(mutex_);
-    {
-        cached_ = std::move(torrents);
-    }
+    cached_ = std::move(torrents);
     QMetaObject::invokeMethod(this, "onCachedTorrentsUpdated", Qt::QueuedConnection);
 }
 
 void TorrentList::onCachedTorrentsUpdated()
 {
     std::vector<librt::Torrent> tl;
-
-    std::lock_guard<std::mutex> lock(mutex_);
+    if (session_ == Q_NULLPTR)
     {
-        if (session_ == Q_NULLPTR)
-        {
-            cached_.clear();
-            torrents_.clear();
-            return;
-        }
-
-        tl.reserve(cached_.size());
-        for (auto &&torrent: cached_)
-        {
-            tl.push_back(std::move(torrent));
-        }
+        cached_.clear();
+        torrents_.clear();
+        return;
     }
+    tl = std::move(cached_);
+    cached_.clear();
+    session_->torrentUpdateLock_.unlock();
 
     if (tl.empty())
     {

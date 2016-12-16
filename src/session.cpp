@@ -11,11 +11,21 @@ Session::Session(QObject *parent) :
     active_(false),
     session_(),
     stats_(),
-    torrentList_(*this)
+    statsUpdate_(session_, stats_),
+    torrentList_(*this),
+    torrentUpdateLock_(),
+    torrentListUpdate_(session_, torrentList_, torrentUpdateLock_),
+    workers_()
 {
     timer_.setInterval(5000);
     timer_.setSingleShot(false);
     QObject::connect(&timer_, &QTimer::timeout, this, &Session::update);
+    workers_.setMaxThreadCount(2);
+}
+
+Session::~Session()
+{
+    workers_.clear();
 }
 
 QString Session::host() const
@@ -194,22 +204,6 @@ TorrentList *Session::torrents()
 
 void Session::update()
 {
-    QtConcurrent::run(QThreadPool::globalInstance(), [this]() {
-        auto r = session_.statistics();
-        if (!r.error)
-        {
-            stats_.setTotalTorrentCount(r.value.totalTorrentCount);
-            stats_.setActiveTorrentCount(r.value.activeTorrentCount);
-            stats_.setPausedTorrentCount(r.value.pausedTorrentCount);
-            stats_.setDownloadSpeed(r.value.downloadSpeed);
-            stats_.setUploadSpeed(r.value.uploadSpeed);
-        }
-    });
-    QtConcurrent::run(QThreadPool::globalInstance(), [this]() {
-        auto r = session_.torrents();
-        if (!r.error)
-        {
-            torrentList_.update(std::move(r.value));
-        }
-    });
+    workers_.start(&statsUpdate_);
+    workers_.start(&torrentListUpdate_);
 }

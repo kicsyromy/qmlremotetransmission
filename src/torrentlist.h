@@ -50,7 +50,6 @@ private:
     QPointer<Session> session_;
     std::vector<librt::Torrent> cached_;
     std::vector<Torrent> torrents_;
-    std::mutex mutex_;
     Sorting sorting_;
 };
 
